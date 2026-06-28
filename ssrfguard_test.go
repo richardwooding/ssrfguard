@@ -117,13 +117,34 @@ func TestValidateURLContextHonorsDeadline(t *testing.T) {
 
 	select {
 	case err := <-done:
-		// A timed-out lookup is treated as unresolvable, hence allowed.
-		if err != nil {
-			t.Fatalf("ValidateURLContext = %v, want nil", err)
+		// A canceled/timed-out lookup surfaces the context error rather than
+		// masquerading as a successful validation.
+		if !errors.Is(err, context.DeadlineExceeded) {
+			t.Fatalf("ValidateURLContext = %v, want context.DeadlineExceeded", err)
 		}
 	case <-time.After(5 * time.Second):
 		t.Fatal("ValidateURLContext did not honor the context deadline")
 	}
+}
+
+func TestValidateURLZeroValueGuardDoesNotPanic(t *testing.T) {
+	// A Guard built directly (bypassing New) has a nil resolver and an empty
+	// scheme set. ValidateURLContext must not panic; resolution falls back to
+	// net.DefaultResolver. Use a short deadline so a real lookup can't hang.
+	g := &Guard{schemes: map[string]struct{}{"https": {}}}
+
+	// Literal IP needs no resolution at all.
+	if err := g.ValidateURL("https://10.0.0.1"); !errors.Is(err, ErrBlockedAddress) {
+		t.Fatalf("ValidateURL(private literal IP) = %v, want ErrBlockedAddress", err)
+	}
+
+	// A named host triggers the resolver path; the nil-resolver fallback must
+	// engage instead of panicking. The result depends on the ambient resolver
+	// (the reserved .invalid TLD does not resolve), so we only require that the
+	// call completes without panicking. A short deadline keeps it from hanging.
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	_ = g.ValidateURLContext(ctx, "https://nonexistent.invalid/feed")
 }
 
 func TestWithSchemes(t *testing.T) {

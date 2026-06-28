@@ -156,6 +156,11 @@ func (g *Guard) ValidateURL(rawURL string) error {
 // governs DNS resolution of named hosts. Pass a context with a deadline to bound
 // the lookup, which a parse-time-only check otherwise leaves at the mercy of the
 // resolver — a slow or unreachable DNS server can stall an unbounded lookup.
+//
+// If ctx is canceled or its deadline elapses during resolution, it returns
+// ctx.Err(). A genuine DNS resolution failure (an unresolvable name) is not an
+// error: the host is allowed, leaving the dial-time [Guard.Control] hook to block
+// it if it later resolves to an internal address.
 func (g *Guard) ValidateURLContext(ctx context.Context, rawURL string) error {
 	if rawURL == "" {
 		return ErrEmptyURL
@@ -190,9 +195,19 @@ func (g *Guard) validateHost(ctx context.Context, hostname string) error {
 		}
 		return nil
 	}
-	addrs, err := g.resolver.LookupIPAddr(ctx, hostname)
+	resolver := g.resolver
+	if resolver == nil {
+		// Defensive: a Guard built directly (bypassing New) has no resolver.
+		resolver = net.DefaultResolver
+	}
+	addrs, err := resolver.LookupIPAddr(ctx, hostname)
 	if err != nil {
-		// Unresolvable for now; let the dial-time guard catch it later.
+		if ctx.Err() != nil {
+			// The caller canceled or the deadline elapsed; surface it rather
+			// than masquerading a context error as a successful validation.
+			return ctx.Err()
+		}
+		// Genuinely unresolvable for now; let the dial-time guard catch it later.
 		return nil
 	}
 	for _, addr := range addrs {
