@@ -1,10 +1,24 @@
 package ssrfguard
 
 import (
+	"context"
+	"errors"
 	"net"
 	"net/url"
 	"testing"
 )
+
+// failFastResolver returns a resolver that never touches the network: every
+// lookup fails immediately. It keeps the fuzzer hermetic, so arbitrary generated
+// hostnames can't stall a worker on a real (slow or unreachable) DNS server.
+func failFastResolver() *net.Resolver {
+	return &net.Resolver{
+		PreferGo: true,
+		Dial: func(context.Context, string, string) (net.Conn, error) {
+			return nil, errors.New("dns disabled in fuzzing")
+		},
+	}
+}
 
 // FuzzValidateURL checks that ValidateURL never panics on arbitrary input and
 // that it never accepts a URL whose host is a literal IP the policy blocks.
@@ -34,7 +48,7 @@ func FuzzValidateURL(f *testing.F) {
 		f.Add(s)
 	}
 
-	g := New()
+	g := New(WithResolver(failFastResolver()))
 	f.Fuzz(func(t *testing.T, raw string) {
 		err := g.ValidateURL(raw) // must not panic
 
