@@ -1,11 +1,14 @@
 package ssrfguard
 
 import (
+	"context"
 	"errors"
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"sync/atomic"
 	"testing"
+	"time"
 )
 
 func TestValidateURL(t *testing.T) {
@@ -67,6 +70,59 @@ func TestValidateURLUnresolvableIsAllowed(t *testing.T) {
 	// at validation time and left for the dial-time guard.
 	if err := New().ValidateURL("https://nonexistent.invalid/feed"); err != nil {
 		t.Fatalf("ValidateURL(unresolvable) = %v, want nil", err)
+	}
+}
+
+func TestWithResolverIsUsed(t *testing.T) {
+	// A custom resolver that fails fast without touching the network. The lookup
+	// erroring means the host is treated as unresolvable, hence allowed.
+	var dialed atomic.Bool
+	r := &net.Resolver{
+		PreferGo: true,
+		Dial: func(context.Context, string, string) (net.Conn, error) {
+			dialed.Store(true)
+			return nil, errors.New("no network in test")
+		},
+	}
+	if err := New(WithResolver(r)).ValidateURL("https://example.com/feed"); err != nil {
+		t.Fatalf("ValidateURL with fail-fast resolver = %v, want nil", err)
+	}
+	if !dialed.Load() {
+		t.Fatal("the custom resolver was not used")
+	}
+}
+
+func TestWithResolverNilIgnored(t *testing.T) {
+	g := New(WithResolver(nil))
+	if g.resolver != net.DefaultResolver {
+		t.Fatal("WithResolver(nil) should leave the default resolver in place")
+	}
+}
+
+func TestValidateURLContextHonorsDeadline(t *testing.T) {
+	// A resolver that blocks until its lookup context is canceled, proving that
+	// the context passed to ValidateURLContext propagates into DNS resolution.
+	r := &net.Resolver{
+		PreferGo: true,
+		Dial: func(ctx context.Context, _, _ string) (net.Conn, error) {
+			<-ctx.Done()
+			return nil, ctx.Err()
+		},
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
+	defer cancel()
+
+	done := make(chan error, 1)
+	go func() { done <- New(WithResolver(r)).ValidateURLContext(ctx, "https://example.com/feed") }()
+
+	select {
+	case err := <-done:
+		// A timed-out lookup is treated as unresolvable, hence allowed.
+		if err != nil {
+			t.Fatalf("ValidateURLContext = %v, want nil", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("ValidateURLContext did not honor the context deadline")
 	}
 }
 

@@ -88,6 +88,19 @@ if err := g.ValidateURL(userSuppliedURL); err != nil {
 name — that it isn't an internal address. A name that can't currently be resolved
 is allowed through; the dial-time guard remains the backstop.
 
+`ValidateURL` resolves names with a background context, so the lookup is bounded
+only by the resolver. To impose a deadline — important when validating
+attacker-supplied URLs, since a slow DNS server would otherwise stall the call —
+use `ValidateURLContext`:
+
+```go
+ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
+defer cancel()
+if err := g.ValidateURLContext(ctx, userSuppliedURL); err != nil {
+    return fmt.Errorf("rejected: %w", err)
+}
+```
+
 ### Options
 
 ```go
@@ -96,6 +109,10 @@ ssrfguard.New(ssrfguard.WithSchemes("https"))
 
 // Permit internal ranges (trusted/dev environments).
 ssrfguard.New(ssrfguard.WithAllowPrivate(true))
+
+// Resolve names with a custom resolver — point DNS at a specific server, bound
+// lookups with a Dial hook, or make tests hermetic. Defaults to net.DefaultResolver.
+ssrfguard.New(ssrfguard.WithResolver(myResolver))
 ```
 
 ## Comparison

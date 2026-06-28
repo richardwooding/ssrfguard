@@ -26,6 +26,7 @@
 package ssrfguard
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net"
@@ -59,6 +60,7 @@ var (
 type Guard struct {
 	schemes      map[string]struct{}
 	allowPrivate bool
+	resolver     *net.Resolver
 }
 
 // Option configures a [Guard] passed to [New].
@@ -87,11 +89,30 @@ func WithAllowPrivate(allow bool) Option {
 	return func(g *Guard) { g.allowPrivate = allow }
 }
 
+// WithResolver sets the [net.Resolver] used to resolve named hosts during URL
+// validation. The default is [net.DefaultResolver]. A nil resolver is ignored,
+// leaving the default in place.
+//
+// Supplying a custom resolver lets callers point DNS at a specific server, apply
+// a [net.Resolver.Dial] hook (for example to enforce a timeout or to make tests
+// hermetic by failing fast instead of touching the network), or otherwise
+// control resolution. It composes with [Guard.ValidateURLContext], which carries
+// a deadline into the lookup.
+func WithResolver(r *net.Resolver) Option {
+	return func(g *Guard) {
+		if r != nil {
+			g.resolver = r
+		}
+	}
+}
+
 // New returns a Guard with the given options. By default it allows the http and
-// https schemes and blocks internal address ranges.
+// https schemes, blocks internal address ranges, and resolves named hosts with
+// [net.DefaultResolver].
 func New(opts ...Option) *Guard {
 	g := &Guard{
-		schemes: map[string]struct{}{"http": {}, "https": {}},
+		schemes:  map[string]struct{}{"http": {}, "https": {}},
+		resolver: net.DefaultResolver,
 	}
 	for _, opt := range opts {
 		opt(g)
@@ -123,7 +144,19 @@ func (g *Guard) IsBlockedIP(ip net.IP) bool {
 // A named host that cannot currently be resolved is allowed, so transient DNS
 // failures don't reject otherwise-valid URLs; the dial-time [Guard.Control] hook
 // still blocks it if it later resolves to an internal address.
+//
+// ValidateURL resolves named hosts with a background context, so the lookup is
+// bounded only by the resolver's own settings. Use [Guard.ValidateURLContext] to
+// impose a deadline or to make the lookup cancellable.
 func (g *Guard) ValidateURL(rawURL string) error {
+	return g.ValidateURLContext(context.Background(), rawURL)
+}
+
+// ValidateURLContext is [Guard.ValidateURL] with a caller-supplied context that
+// governs DNS resolution of named hosts. Pass a context with a deadline to bound
+// the lookup, which a parse-time-only check otherwise leaves at the mercy of the
+// resolver — a slow or unreachable DNS server can stall an unbounded lookup.
+func (g *Guard) ValidateURLContext(ctx context.Context, rawURL string) error {
 	if rawURL == "" {
 		return ErrEmptyURL
 	}
@@ -140,11 +173,11 @@ func (g *Guard) ValidateURL(rawURL string) error {
 	if g.allowPrivate {
 		return nil
 	}
-	return g.validateHost(u.Hostname())
+	return g.validateHost(ctx, u.Hostname())
 }
 
 // validateHost rejects hostnames that are, or resolve to, blocked addresses.
-func (g *Guard) validateHost(hostname string) error {
+func (g *Guard) validateHost(ctx context.Context, hostname string) error {
 	if hostname == "" {
 		return ErrMissingHost
 	}
@@ -157,14 +190,14 @@ func (g *Guard) validateHost(hostname string) error {
 		}
 		return nil
 	}
-	ips, err := net.LookupIP(hostname)
+	addrs, err := g.resolver.LookupIPAddr(ctx, hostname)
 	if err != nil {
 		// Unresolvable for now; let the dial-time guard catch it later.
 		return nil
 	}
-	for _, ip := range ips {
-		if g.IsBlockedIP(ip) {
-			return fmt.Errorf("%w: %s resolves to %s", ErrBlockedAddress, hostname, ip)
+	for _, addr := range addrs {
+		if g.IsBlockedIP(addr.IP) {
+			return fmt.Errorf("%w: %s resolves to %s", ErrBlockedAddress, hostname, addr.IP)
 		}
 	}
 	return nil

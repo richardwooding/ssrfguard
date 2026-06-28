@@ -4,6 +4,17 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- `Guard.ValidateURLContext` — `ValidateURL` with a caller-supplied context that
+  governs DNS resolution, so a slow or unreachable resolver can't stall an
+  unbounded lookup. `ValidateURL` now delegates to it with `context.Background()`.
+- `WithResolver` — sets the `net.Resolver` used to resolve named hosts (defaults
+  to `net.DefaultResolver`). Lets callers point DNS at a specific server, apply a
+  `Dial` hook to bound or cancel lookups, or make tests hermetic by failing fast
+  instead of touching the network.
+
 ## [0.1.0] - 2026-06-07
 
 Initial release.
