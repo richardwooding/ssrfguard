@@ -4,6 +4,16 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.1] - 2026-06-28
+
+### Fixed
+- `Guard.ValidateURLContext` now returns `ctx.Err()` when the context is canceled
+  or its deadline elapses during DNS resolution, instead of masquerading the
+  context error as a successful validation. A genuine unresolvable host is still
+  allowed (left to the dial-time guard).
+- Guard a directly-constructed `&Guard{}` (one built without `New`) against a nil
+  resolver by falling back to `net.DefaultResolver`, avoiding a panic.
+
 ## [0.2.0] - 2026-06-28
 
 ### Added
@@ -32,5 +42,6 @@ Initial release.
 - `Guard.Dialer`, `Guard.Transport`, and `Guard.Client` helpers for guarded
   outbound HTTP.
 
+[0.2.1]: https://github.com/richardwooding/ssrfguard/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/richardwooding/ssrfguard/releases/tag/v0.2.0
 [0.1.0]: https://github.com/richardwooding/ssrfguard/releases/tag/v0.1.0
