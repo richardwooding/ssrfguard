@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ssrfguard — stop SSRF at dial time in Go</title>
+<meta name="description" content="A dependency-free Go library that validates outbound URLs and blocks internal addresses — enforced after DNS resolution, just before connect, so it holds up against DNS-rebinding attacks that most up-front URL checks miss.">
+<meta property="og:title" content="ssrfguard">
+<meta property="og:description" content="A dependency-free Go library that blocks SSRF at dial time — enforced after DNS resolution, robust against DNS rebinding.">
+<meta property="og:type" content="website">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><rect width='24' height='24' rx='6' fill='%23161b22'/><rect x='5' y='12' width='3.5' height='7' rx='1' fill='%23a371f7'/><rect x='10.25' y='8' width='3.5' height='11' rx='1' fill='%23bd93ff'/><rect x='15.5' y='4' width='3.5' height='15' rx='1' fill='%23d2b3ff'/></svg>">
+<script>try{var t=localStorage.getItem("gl-theme");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="stylesheet" href="gloam.css">
+</head>
+<body class="gl">
+<a class="gl-skip" href="#main">Skip to content</a>
+
+<header class="gl-nav">
+  <div class="gl-wrap">
+    <span class="gl-brand">
+      <svg width="26" height="26" viewBox="0 0 24 24" aria-hidden="true">
+        <rect width="24" height="24" rx="6" fill="var(--gl-panel-2)"/>
+        <rect x="5" y="12" width="3.5" height="7" rx="1" fill="var(--gl-accent)"/>
+        <rect x="10.25" y="8" width="3.5" height="11" rx="1" fill="var(--gl-accent-2)"/>
+        <rect x="15.5" y="4" width="3.5" height="15" rx="1" fill="#d2b3ff"/>
+      </svg>
+      ssrfguard
+    </span>
+    <button class="gl-nav-toggle" aria-label="Toggle navigation" data-gl-nav-toggle="nav" aria-expanded="false">☰</button>
+    <nav id="nav">
+      <a href="#features">Features</a>
+      <a href="#usage">Usage</a>
+      <a href="#install">Install</a>
+      <button class="gl-theme-toggle" data-gl-theme-toggle aria-label="Toggle color theme" aria-pressed="true">
+        <svg class="gl-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+        <svg class="gl-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M19.1 4.9l-1.4 1.4M6.3 17.7l-1.4 1.4"/></svg>
+      </button>
+      <a class="gl-btn ghost" href="https://github.com/richardwooding/ssrfguard">GitHub ★</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+  <section class="gl-hero">
+    <div class="gl-wrap gl-hero-grid">
+      <div>
+        <p class="gl-eyebrow">go · zero deps · dial-time</p>
+        <h1>Stop SSRF <span class="gl-grad">at dial time.</span></h1>
+        <p class="sub">A dependency-free Go library that validates outbound URLs and blocks internal addresses — enforced after DNS resolution, just before connect, so it holds up against the DNS-rebinding attacks that most up-front URL checks miss.</p>
+        <div class="gl-cta">
+          <a class="gl-btn primary" href="#install">Install</a>
+          <a class="gl-btn ghost" href="https://pkg.go.dev/github.com/richardwooding/ssrfguard">Go Reference</a>
+        </div>
+        <p class="gl-hint">MIT licensed · no third-party dependencies · Go 1.26+</p>
+      </div>
+      <div class="gl-term">
+        <div class="bar">
+          <span class="dot" style="background:#ff5f56"></span>
+          <span class="dot" style="background:#ffbd2e"></span>
+          <span class="dot" style="background:#27c93f"></span>
+          <span class="t">guard.go</span>
+        </div>
+<pre><span class="n">client</span> := ssrfguard.New().Client()
+resp, err := client.Get(<span class="n">untrustedURL</span>)
+if errors.Is(err, ssrfguard.<span class="ok">ErrBlockedAddress</span>) {
+    <span class="hd">// refused to connect to an internal address</span>
+}</pre>
+      </div>
+    </div>
+  </section>
+
+  <section class="gl-section" id="features">
+    <div class="gl-wrap">
+      <p class="gl-eyebrow">what you get</p>
+      <h2>Defense that fires where it counts.</h2>
+      <p class="gl-lede" style="margin-top:14px">One small guard that inspects the real socket destination — closing the gap between URL validation and the actual connection.</p>
+      <div class="gl-grid feat" style="margin-top:32px">
+
+        <div class="gl-card">
+          <h3><span class="gl-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></span>Dial-time enforcement</h3>
+          <p>Inspects the real IP the socket will reach — via <code>net.Dialer.Control</code>, which runs after DNS resolution and just before connect — closing the DNS-rebinding window.</p>
+        </div>
+
+        <div class="gl-card">
+          <h3><span class="gl-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M5.6 5.6l12.8 12.8"/></svg></span>Blocks the dangerous ranges</h3>
+          <p>Loopback, RFC 1918 / RFC 4193 private, link-local — including the cloud metadata address <code>169.254.169.254</code> — and unspecified addresses.</p>
+        </div>
+
+        <div class="gl-card">
+          <h3><span class="gl-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18M3 12h18"/><circle cx="12" cy="12" r="9"/></svg></span>Zero dependencies</h3>
+          <p>Pure standard library. Nothing to audit beyond Go itself, and nothing to pull into your supply chain.</p>
+        </div>
+
+        <div class="gl-card">
+          <h3><span class="gl-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><path d="M10 6.5h4M6.5 10v4M17.5 10v4"/></svg></span>Composable</h3>
+          <p>Use a guarded <code>http.Client</code>, wrap your own tuned <code>http.Transport</code>, or attach the control directly to a <code>net.Dialer</code>.</p>
+        </div>
+
+        <div class="gl-card">
+          <h3><span class="gl-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3 8-8"/><path d="M21 12v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h11"/></svg></span>Validate now, fetch later</h3>
+          <p><code>ValidateURL</code> / <code>ValidateURLContext</code> give you an up-front check for URLs you store and dereference later.</p>
+        </div>
+
+        <div class="gl-card">
+          <h3><span class="gl-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span>Configurable</h3>
+          <p>Scheme allowlist with <code>WithSchemes</code>, <code>WithAllowPrivate</code>, and a custom <code>WithResolver</code>. It correctly classifies IPv4-mapped IPv6 addresses.</p>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <section class="gl-section" id="usage">
+    <div class="gl-wrap">
+      <p class="gl-eyebrow">usage</p>
+      <h2>Guard the fetch, or check up front.</h2>
+      <p class="gl-lede" style="margin-top:14px">Use a guarded client when you fetch immediately; validate the URL first when you store it now and dereference it later.</p>
+      <div class="gl-split" style="margin-top:28px">
+<pre class="gl-code"><span class="c">// Guarded client — enforced at dial time</span>
+client := ssrfguard.New().Client()
+resp, err := client.Get(untrustedURL)
+<span class="k">if</span> errors.Is(err, ssrfguard.ErrBlockedAddress) {
+    <span class="c">// refused to dial an internal address</span>
+}</pre>
+<pre class="gl-code"><span class="c">// Up-front check — store now, fetch later</span>
+<span class="k">if</span> err := ssrfguard.ValidateURL(u); err != nil {
+    <span class="c">// reject before you persist the URL</span>
+    <span class="k">return</span> err
+}</pre>
+      </div>
+      <ul class="gl-badges" aria-label="API surface" style="margin-top:26px">
+        <li class="gl-lang">New / .Client</li>
+        <li class="gl-lang">ValidateURL</li>
+        <li class="gl-lang">ValidateURLContext</li>
+        <li class="gl-lang">ErrBlockedAddress</li>
+        <li class="gl-lang">WithSchemes</li>
+        <li class="gl-lang">WithAllowPrivate</li>
+        <li class="gl-lang">WithResolver</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="gl-section" id="install">
+    <div class="gl-wrap">
+      <p class="gl-eyebrow">install</p>
+      <h2>Add it to your module.</h2>
+      <p class="gl-lede" style="margin-top:14px">One import, no transitive dependencies. Requires Go 1.26+.</p>
+      <div class="gl-install" style="margin-top:26px">
+        <div class="gl-snip">
+          <span class="lbl">go get</span>
+          <code id="i1">go get github.com/richardwooding/ssrfguard</code>
+          <button class="gl-copy" data-gl-copy="i1">Copy</button>
+        </div>
+        <div class="gl-snip">
+          <span class="lbl">import</span>
+          <code id="i2">import "github.com/richardwooding/ssrfguard"</code>
+          <button class="gl-copy" data-gl-copy="i2">Copy</button>
+        </div>
+      </div>
+      <p class="gl-hint">Requires Go 1.26+ with no third-party dependencies. Full API docs live on <a href="https://pkg.go.dev/github.com/richardwooding/ssrfguard">pkg.go.dev</a>.</p>
+    </div>
+  </section>
+</main>
+
+<footer class="gl-footer">
+  <div class="gl-wrap">
+    <span class="gl-brand" style="font-size:.98rem">ssrfguard · MIT · <span data-gl-year></span></span>
+    <nav class="gl-fnav">
+      <a href="https://richardwooding.github.io/">Richard Wooding</a>
+      <a href="https://github.com/richardwooding/ssrfguard">GitHub</a>
+      <a href="https://pkg.go.dev/github.com/richardwooding/ssrfguard">Go Reference</a>
+      <a href="https://github.com/richardwooding/ssrfguard/blob/main/LICENSE">License</a>
+    </nav>
+  </div>
+</footer>
+
+<script src="gloam.js" defer></script>
+</body>
+</html>
