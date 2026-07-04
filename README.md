@@ -4,6 +4,8 @@
 [![Go](https://github.com/richardwooding/ssrfguard/actions/workflows/go.yml/badge.svg)](https://github.com/richardwooding/ssrfguard/actions/workflows/go.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
+**Website:** [richardwooding.github.io/ssrfguard](https://richardwooding.github.io/ssrfguard/)
+
 A small, dependency-free Go library that helps prevent **Server-Side Request
 Forgery (SSRF)**. It validates outbound URLs and blocks requests to internal
 address ranges — and it can enforce the block **at dial time**, which is what
