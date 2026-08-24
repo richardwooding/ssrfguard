@@ -1,5 +1,4 @@
 module github.com/richardwooding/ssrfguard
 
-go 1.26
+go 1.27.0
 
-toolchain go1.26.4
